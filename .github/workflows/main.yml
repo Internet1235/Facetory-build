@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest,xcode-27]
+        os: [windows-latest,ubuntu-latest,xcode-27]
     runs-on: ${{ matrix.os }}
 
     defaults:
@@ -38,7 +38,6 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.90.0
           components: clippy,rustfmt
 
       - name: Install pinned FRB generator
@@ -122,32 +121,3 @@ jobs:
             Facetory/windows/installer/output/*
             Facetory/build/app/outputs/flutter-apk/*
             Facetory/build/macos/Build/Products/Release/*.dmg
-
-      - name: Upload WebDAV
-        if: matrix.os == 'windows-latest'
-        shell: bash
-        run: |
-          for f in windows/installer/output/*; do
-            curl --fail --show-error -T "$f" \
-              -u "${{secrets.username}}:${{secrets.password}}" \
-              "${{secrets.address}}/Facetory/v${{ steps.tag.outputs.release_tag }}/$(basename "$f")"
-          done
-          
-      - name: Upload WebDAV
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          for f in build/app/outputs/flutter-apk/*; do
-            curl --fail --show-error -T "$f" \
-            -u "${{secrets.username}}:${{secrets.password}}" \
-            "${{secrets.address}}/Facetory/v${{ steps.tag.outputs.release_tag }}/"
-          done
-
-      - name: Upload WebDAV
-        if: matrix.os == 'xcode-27'
-        shell: bash
-        run: |
-          for f in build/macos/Build/Products/Release/*.dmg; do
-            curl --fail --show-error -T "$f" \
-            -u "${{secrets.username}}:${{secrets.password}}" \
-            "${{secrets.address}}/Facetory/v${{ steps.tag.outputs.release_tag }}/"
-          done
