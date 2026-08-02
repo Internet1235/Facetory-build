@@ -22,8 +22,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          repository: AstralSightStudios/Facetory
+          repository: Internet1235/Facetory
           path: Facetory
+          token: ${{ secrets.PAT_TOKEN }}
+
       - uses: actions/checkout@v4
         with:
           repository: AstralSightStudios/ClaralightDesign-Flutter
@@ -123,11 +125,13 @@ jobs:
 
       - name: Upload WebDAV
         if: matrix.os == 'windows-latest'
-        shell: cmd
+        shell: bash
         run: |
-          for %%f in (windows\installer\output\*) do (
-            curl --fail --show-error -T "%%f" -u "${{secrets.username}}:${{secrets.password}}" "${{secrets.address}}/Facetory/v${{ steps.tag.outputs.release_tag }}/%%~nxf"
-          )
+          for f in windows/installer/output/*; do
+            curl --fail --show-error -T "$f" \
+              -u "${{secrets.username}}:${{secrets.password}}" \
+              "${{secrets.address}}/Facetory/v${{ steps.tag.outputs.release_tag }}/$(basename "$f")"
+          done
           
       - name: Upload WebDAV
         if: matrix.os == 'ubuntu-latest'
