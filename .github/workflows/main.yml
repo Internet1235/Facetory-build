@@ -1,0 +1,148 @@
+name: Release
+
+on:
+  push:
+
+permissions:
+  contents: write
+
+jobs:
+  quality-and-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest,xcode-27]
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        working-directory: Facetory
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: AstralSightStudios/Facetory
+          path: Facetory
+      - uses: actions/checkout@v4
+        with:
+          repository: AstralSightStudios/ClaralightDesign-Flutter
+          path: ClaralightDesign-Flutter
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.90.0
+          components: clippy,rustfmt
+
+      - name: Install pinned FRB generator
+        run: cargo install flutter_rust_bridge_codegen --version 2.12.0 --locked
+
+      - name: Resolve Flutter dependencies
+        run: flutter pub get
+
+      - name: Generate release tag
+        id: tag
+        if: (!cancelled())
+        shell: bash
+        run: |
+          echo "release_tag=$(grep -m1 '^version:' pubspec.yaml | sed -E 's/version: *([0-9.]+).*/\1/')" >> $GITHUB_OUTPUT
+          touch release.txt
+
+      - name: Build Windows desktop
+        if: matrix.os == 'windows-latest'
+        run: |
+          flutter build windows --release
+          iscc /DFacetoryAppVersion=${{ steps.tag.outputs.release_tag }} windows\installer\Facetory.iss
+
+      - name: Generate signing keys
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cd android
+          echo ${{ secrets.SIGNING_KEY }} | base64 -d > app/sign_key.jks
+          cat > key.properties << EOF
+          storeFile=app/sign_key.jks
+          storePassword=${{ secrets.KEYSTORE_PASSWD }}
+          keyAlias=${{ secrets.KEYALIAS }}
+          keyPassword=${{ secrets.KEYALIAS_PASSWD }}
+          EOF
+
+      - name: Build Android
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          rustup target add aarch64-linux-android
+          flutter build apk --release --target-platform android-arm64
+
+      - name: Build MacOS
+        if: matrix.os == 'xcode-27'
+        shell: bash
+        run: |
+          flutter build macos --release
+          hdiutil create -volname "Facetory" \
+            -srcfolder build/macos/Build/Products/Release/Facetory.app \
+            -ov -format UDZO \
+            build/macos/Build/Products/Release/Facetory_macos_arm64_release_v${{ steps.tag.outputs.release_tag }}.dmg
+      
+      - name: Upload a Build Artifact
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: Facetory-windows
+          path: Facetory\build\windows\x64\runner\Release\*
+
+      - name: Upload a Build Artifact
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: Facetory-android
+          path: Facetory/build/app/outputs/flutter-apk/*
+
+      - name: Upload a Build Artifact
+        if: matrix.os == 'xcode-27'
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: Facetory-macos
+          path: Facetory/build/macos/Build/Products/Release/*
+
+      - name: Upload firmware to release
+        uses: softprops/action-gh-release@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.tag.outputs.release_tag }}
+          name: Release ${{ steps.tag.outputs.release_tag }}
+          body_path: release.txt
+          files: |
+            Facetory/windows/installer/output/*
+            Facetory/build/app/outputs/flutter-apk/*
+            Facetory/build/macos/Build/Products/Release/*.dmg
+
+      - name: Upload WebDAV
+        if: matrix.os == 'windows-latest'
+        shell: cmd
+        run: |
+          for %%f in (windows\installer\output\*) do (
+            curl --fail --show-error -T "%%f" -u "${{secrets.username}}:${{secrets.password}}" "${{secrets.address}}/Facetory/v${{ steps.tag.outputs.release_tag }}/%%~nxf"
+          )
+          
+      - name: Upload WebDAV
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          for f in build/app/outputs/flutter-apk/*; do
+            curl --fail --show-error -T "$f" \
+            -u "${{secrets.username}}:${{secrets.password}}" \
+            "${{secrets.address}}/Facetory/v${{ steps.tag.outputs.release_tag }}/"
+          done
+
+      - name: Upload WebDAV
+        if: matrix.os == 'xcode-27'
+        shell: bash
+        run: |
+          for f in build/macos/Build/Products/Release/*.dmg; do
+            curl --fail --show-error -T "$f" \
+            -u "${{secrets.username}}:${{secrets.password}}" \
+            "${{secrets.address}}/Facetory/v${{ steps.tag.outputs.release_tag }}/"
+          done
