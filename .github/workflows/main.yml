@@ -24,6 +24,7 @@ jobs:
         with:
           repository: Internet1235/Facetory
           path: Facetory
+          ref: laggy-bg
           token: ${{ secrets.PAT_TOKEN }}
 
       - uses: actions/checkout@v7
