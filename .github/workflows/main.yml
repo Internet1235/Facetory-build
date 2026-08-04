@@ -20,13 +20,13 @@ jobs:
         working-directory: Facetory
     
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: Internet1235/Facetory
           path: Facetory
           token: ${{ secrets.PAT_TOKEN }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: AstralSightStudios/ClaralightDesign-Flutter
           path: ClaralightDesign-Flutter
@@ -90,21 +90,21 @@ jobs:
       
       - name: Upload a Build Artifact
         if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: Facetory-windows
           path: Facetory\build\windows\x64\runner\Release\*
 
       - name: Upload a Build Artifact
         if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: Facetory-android
           path: Facetory/build/app/outputs/flutter-apk/*
 
       - name: Upload a Build Artifact
         if: matrix.os == 'xcode-27'
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7
         with:
           name: Facetory-macos
           path: Facetory/build/macos/Build/Products/Release/*
